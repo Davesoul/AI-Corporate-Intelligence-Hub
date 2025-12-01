@@ -1,0 +1,7 @@
+CTkMessagebox==2.7
+currency_converter==0.5.5
+customtkinter==5.2.2
+docxtpl==0.20.1
+Pillow
+reportlab
+Spire.Doc.Free

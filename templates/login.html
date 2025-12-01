@@ -2,13 +2,17 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>Login</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Login - AI Corporate Hub</title>
+  <link rel="icon" type="image/svg+xml" href="/static/logo.svg">
   <link rel="stylesheet" href="/static/styles.css">
-
 </head>
 <body>
   <div class="login-container">
-    <h1>Login</h1>
+    <div class="login-logo">
+      <img src="/static/logo.svg" alt="AI Corporate Hub" width="64" height="64">
+      <h1>AI Corporate Hub</h1>
+    </div>
 
     <form id="loginForm" method="post" action="/login">
       {% if error %}

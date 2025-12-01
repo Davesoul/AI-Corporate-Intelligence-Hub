@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#6366f1;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#8b5cf6;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="grad2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#22d3ee;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#6366f1;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Main hexagon background -->
+  <polygon points="32,2 58,17 58,47 32,62 6,47 6,17" fill="url(#grad1)" />
+  
+  <!-- Inner hexagon -->
+  <polygon points="32,10 50,21 50,43 32,54 14,43 14,21" fill="#1e1b4b" opacity="0.3"/>
+  
+  <!-- AI Brain/Circuit icon -->
+  <circle cx="32" cy="28" r="10" fill="none" stroke="url(#grad2)" stroke-width="2"/>
+  
+  <!-- Neural nodes -->
+  <circle cx="32" cy="28" r="3" fill="#22d3ee"/>
+  <circle cx="24" cy="24" r="2" fill="#22d3ee"/>
+  <circle cx="40" cy="24" r="2" fill="#22d3ee"/>
+  <circle cx="26" cy="34" r="2" fill="#22d3ee"/>
+  <circle cx="38" cy="34" r="2" fill="#22d3ee"/>
+  
+  <!-- Connection lines -->
+  <line x1="32" y1="28" x2="24" y2="24" stroke="#22d3ee" stroke-width="1.5"/>
+  <line x1="32" y1="28" x2="40" y2="24" stroke="#22d3ee" stroke-width="1.5"/>
+  <line x1="32" y1="28" x2="26" y2="34" stroke="#22d3ee" stroke-width="1.5"/>
+  <line x1="32" y1="28" x2="38" y2="34" stroke="#22d3ee" stroke-width="1.5"/>
+  
+  <!-- Building/Corporate icon below -->
+  <rect x="26" y="42" width="12" height="12" rx="1" fill="#fff" opacity="0.9"/>
+  <rect x="28" y="44" width="3" height="3" fill="#6366f1"/>
+  <rect x="33" y="44" width="3" height="3" fill="#6366f1"/>
+  <rect x="28" y="49" width="3" height="5" fill="#6366f1"/>
+  <rect x="33" y="49" width="3" height="3" fill="#6366f1"/>
+</svg>

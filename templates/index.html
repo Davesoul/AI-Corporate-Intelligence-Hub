@@ -3,31 +3,48 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>AI Corporate Assistant</title>
+  <title>AI Corporate Hub</title>
+  <link rel="icon" type="image/svg+xml" href="/static/logo.svg">
   <link rel="stylesheet" href="/static/styles.css"/>
 </head>
 <body>
+  <!-- Sidebar Overlay for mobile -->
+  <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
   <aside id="sidebar">
     <div class="brand">
-      <img src="logo.png" alt="Logo" class="logo" />
+      <img src="/static/logo.svg" alt="AI Corporate Hub Logo" class="logo" />
       <div class="brand-text">
         <strong>AI Corporate Hub</strong>
-        <small>Assistant</small>
+        <small>Intelligence Assistant</small>
       </div>
     </div>
 
     <div class="ribbon">
-      <button id="new-chat-btn" class="ribbon-btn">🗑️ Clear chat</button>
-<!--      <button id="history-btn" class="ribbon-btn">📚 History</button>-->
+      <button id="new-chat-btn" class="ribbon-btn">➕ New Chat</button>
+      <button id="upload-btn" class="ribbon-btn">📁 Upload Document</button>
       <button id="analytics-btn" class="ribbon-btn">📊 Analytics</button>
+    </div>
+
+    <!-- Conversation History -->
+    <div class="history-section">
+      <div class="history-header">
+        <span>💬 Chat History</span>
+        <button id="refresh-history-btn" class="history-refresh" title="Refresh">🔄</button>
+      </div>
+      <div id="history-list" class="history-list">
+        <!-- Conversations will be loaded here -->
+      </div>
     </div>
 
     <div class="controls">
       <label for="voice-select" class="control-label">Assistant voice</label>
       <select id="voice-select"></select>
 
-<!--      <label for="lang-select" class="control-label">Recognition language</label>-->
-<!--      <select id="lang-select"></select>-->
+      <div class="access-info">
+        <label class="control-label">Access Level</label>
+        <span id="access-badge" class="access-badge">Loading...</span>
+      </div>
 
       <button id="logout-btn" class="logout">Logout</button>
     </div>
@@ -37,9 +54,10 @@
 
   <main id="main">
     <header class="topbar">
-      <div class="title">AI Corporate Intelligence Assistant</div>
+      <button class="menu-toggle" id="menu-toggle" title="Open menu">☰</button>
+      <div class="title">AI Corporate Intelligence</div>
       <div class="top-actions">
-        <button id="themeToggle" title="Toggle theme">🌓</button>
+        <button id="themeToggle" title="Toggle theme">🌙</button>
       </div>
     </header>
 
@@ -47,9 +65,12 @@
       <div id="chat-box" class="chat-box" role="log" aria-live="polite"></div>
     </section>
 
+    <!-- Hidden file input for uploads -->
+    <input type="file" id="file-input" accept=".pdf,.txt,.md,.doc,.docx,.csv,.json" style="display: none;" />
+
     <footer id="input-area">
       <button id="mic-btn" class="icon-btn" title="Use microphone">🎙️</button>
-      <button id="speech-btn" class="icon-btn" title="cut speech">🔈</button>
+      <button id="speech-btn" class="icon-btn" title="Toggle speech">🔈</button>
 
       <textarea id="user-input" placeholder="Ask anything about projects, tasks or meetings..." rows="1" aria-label="Message"></textarea>
 
@@ -90,6 +111,7 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 
   <script src="/static/script.js" defer></script>
 </body>

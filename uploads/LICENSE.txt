@@ -1,0 +1,73 @@
+CONTRAT DE LICENCE LOGICIEL
+ArettaXchange Bureau de Change - Système de Gestion
+
+Copyright © 2025 Light Group Pro. Tous droits réservés.
+
+LICENCE D'UTILISATION
+
+1. OCTROI DE LICENCE
+   Ce logiciel est concédé sous licence, non vendu. Light Group Pro vous accorde une 
+   licence personnelle, non exclusive et non transférable pour utiliser le logiciel 
+   ArettaXchange Bureau de Change conformément aux termes de cet accord.
+
+2. RESTRICTIONS
+   Vous NE POUVEZ PAS :
+   - Copier, modifier, adapter ou traduire le logiciel
+   - Procéder à l'ingénierie inverse, décompiler ou désassembler le logiciel
+   - Louer, prêter, vendre, sous-licencier ou transférer le logiciel
+   - Supprimer ou modifier les mentions de copyright ou autres mentions de propriété
+
+3. PROPRIÉTÉ INTELLECTUELLE
+   Le logiciel et tous les droits de propriété intellectuelle y afférents sont et 
+   demeurent la propriété exclusive de Light Group Pro. Cette licence ne vous confère 
+   aucun droit de propriété sur le logiciel.
+
+4. UTILISATION AUTORISÉE
+   Ce logiciel est destiné uniquement à un usage professionnel dans le cadre des 
+   opérations d'un bureau de change. Une licence est requise par installation.
+
+5. SUPPORT ET MISES À JOUR
+   Le support technique et les mises à jour sont fournis selon les termes de votre 
+   contrat de maintenance distinct avec Light Group Pro.
+
+6. CONFIDENTIALITÉ
+   Vous vous engagez à maintenir la confidentialité du logiciel et à ne pas divulguer 
+   d'informations concernant sa conception ou son fonctionnement.
+
+7. LIMITATION DE GARANTIE
+   LE LOGICIEL EST FOURNI "EN L'ÉTAT", SANS GARANTIE D'AUCUNE SORTE, EXPRESSE OU 
+   IMPLICITE. LIGHT GROUP PRO NE GARANTIT PAS QUE LE LOGICIEL SERA EXEMPT D'ERREURS 
+   OU FONCTIONNERA SANS INTERRUPTION.
+
+8. LIMITATION DE RESPONSABILITÉ
+   EN AUCUN CAS LIGHT GROUP PRO NE SERA RESPONSABLE DE DOMMAGES DIRECTS, INDIRECTS, 
+   ACCESSOIRES, SPÉCIAUX, EXEMPLAIRES OU CONSÉCUTIFS RÉSULTANT DE L'UTILISATION 
+   OU DE L'IMPOSSIBILITÉ D'UTILISER LE LOGICIEL.
+
+9. CONFORMITÉ RÉGLEMENTAIRE
+   L'utilisateur est seul responsable de s'assurer que l'utilisation du logiciel 
+   est conforme à toutes les lois et réglementations applicables en matière de 
+   change, de lutte contre le blanchiment d'argent et de financement du terrorisme.
+
+10. DURÉE ET RÉSILIATION
+    Cette licence est effective jusqu'à sa résiliation. Elle prendra fin automatiquement 
+    en cas de non-respect de l'une quelconque de ses dispositions. À la résiliation, 
+    vous devez cesser toute utilisation du logiciel et détruire toutes les copies.
+
+11. DONNÉES PERSONNELLES
+    L'utilisation du logiciel pour traiter des données personnelles doit être conforme 
+    aux lois applicables en matière de protection des données.
+
+12. JURIDICTION
+    Ce contrat est régi par les lois en vigueur. Tout litige sera soumis à la 
+    compétence exclusive des tribunaux compétents.
+
+EN UTILISANT CE LOGICIEL, VOUS ACCEPTEZ LES TERMES DE CETTE LICENCE.
+
+Pour toute question concernant cette licence, veuillez contacter :
+Light Group Pro
+Email: lightgroup003@gmail.com
+Téléphone: +225 01 02 22 97 29
+
+Date d'effet : 16 Novembre 2025
+Version : 1.0.0
