@@ -18,6 +18,9 @@ document.addEventListener("DOMContentLoaded", () => {
   let voices = [];
   let languages = [];
   let speechLang = "";
+  let currentSessionId = null;  // Track current conversation session
+  let currentAbortController = null;  // For cancelling ongoing requests
+  let isGenerating = false;  // Track if response is being generated
 
   // ===== Helper Functions =====
   function escapeHtml(text) {
@@ -308,6 +311,38 @@ document.addEventListener("DOMContentLoaded", () => {
   function removeLoadingIndicator() {
     const loading = document.getElementById("loading-indicator");
     if (loading) loading.remove();
+  }
+
+  function showStopButton() {
+    isGenerating = true;
+    sendBtn.innerHTML = "⏹️";
+    sendBtn.title = "Stop generation";
+    sendBtn.classList.add("stop-mode");
+  }
+
+  function hideStopButton() {
+    isGenerating = false;
+    sendBtn.innerHTML = "🚀";
+    sendBtn.title = "Send message";
+    sendBtn.classList.remove("stop-mode");
+    currentAbortController = null;
+  }
+
+  function stopGeneration() {
+    if (currentAbortController) {
+      currentAbortController.abort();
+      currentAbortController = null;
+    }
+    removeLoadingIndicator();
+    clearProcessSteps();
+    hideStopButton();
+    
+    // Add a note that generation was stopped
+    const stoppedMsg = document.createElement("div");
+    stoppedMsg.className = "generation-stopped";
+    stoppedMsg.innerHTML = "<em>⏹️ Generation stopped</em>";
+    chatBox.appendChild(stoppedMsg);
+    chatArea.scrollTop = chatBox.scrollHeight;
   }
 
   function createToolIndicator(toolName, isStart = true) {
@@ -725,20 +760,34 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   async function sendMessage() {
+    // If currently generating, stop instead of sending
+    if (isGenerating) {
+      stopGeneration();
+      return;
+    }
+
     const text = input.value.trim();
     input.value = "";
     if (!text) return;
 
     writeMessage(text, "user");
     createLoadingIndicator();
+    showStopButton();
+    
+    // Create abort controller for this request
+    currentAbortController = new AbortController();
+    const signal = currentAbortController.signal;
+    
     let fullResponse = "";
     let toolsUsed = [];
 
     try {
+      console.log("Sending message with session_id:", currentSessionId);
       const res = await fetch("/api/chat/stream", {
         method: "POST",
         headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({ user_input: text })
+        body: JSON.stringify({ user_input: text, session_id: currentSessionId }),
+        signal: signal
       });
 
       const reader = res.body.getReader();
@@ -792,6 +841,7 @@ document.addEventListener("DOMContentLoaded", () => {
               }
               
               if (data.done) {
+                hideStopButton();
                 // Parse markdown to HTML when complete
                 if (botMsgDiv && fullResponse) {
                   const contentEl = botMsgDiv.querySelector(".message-content");
@@ -807,6 +857,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 loadHistoryList();
               }
               if (data.error) {
+                hideStopButton();
                 removeLoadingIndicator();
                 clearProcessSteps();
                 writeMessage("Error: " + data.error, "bot");
@@ -819,33 +870,42 @@ document.addEventListener("DOMContentLoaded", () => {
         buffer = parts[parts.length - 1];
       }
     } catch (err) {
+      hideStopButton();
       removeLoadingIndicator();
       clearProcessSteps();
-      writeMessage("Error connecting to server.", "bot");
-      console.error(err);
+      
+      // Don't show error for aborted requests
+      if (err.name === 'AbortError') {
+        console.log('Request was aborted');
+      } else {
+        writeMessage("Error connecting to server.", "bot");
+        console.error(err);
+      }
     }
   }
 
   sendBtn.addEventListener("click", sendMessage);
   input.addEventListener("keydown", e => { if (e.key === "Enter") sendMessage(); });
 
-  newChatBtn.addEventListener("click", clearChat);
+  newChatBtn.addEventListener("click", startNewChat);
 
-  async function clearChat() {
+  async function startNewChat() {
     try {
-      const res = await fetch("/clearcache", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ user_input: "clear" })
+      // Reset session on the server - new session created on first message
+      const res = await fetch("/api/conversations/sessions/new", {
+        method: "POST"
       });
-
-      if (!res.ok) throw new Error("Failed to clear cache");
-
-      const chatBox = document.getElementById("chat-box");
-      if (chatBox) chatBox.innerHTML = "";
-      alert("Chat cache cleared!");
+      const data = await res.json();
+      
+      if (data.success) {
+        currentSessionId = null;  // Will be created on first message with proper preview
+        const chatBox = document.getElementById("chat-box");
+        if (chatBox) chatBox.innerHTML = "";
+        // Refresh history list
+        loadHistoryList();
+      }
     } catch (err) {
-      console.error("Error clearing chat:", err);
+      console.error("Error starting new chat:", err);
     }
   }
 
@@ -1013,7 +1073,6 @@ document.addEventListener("DOMContentLoaded", () => {
   displayAccessLevel();
 
   // ===== Conversation History Sidebar =====
-  let currentSessionId = null;
 
   async function loadHistoryList() {
     const historyList = document.getElementById("history-list");
@@ -1023,20 +1082,46 @@ document.addEventListener("DOMContentLoaded", () => {
       const res = await fetch("/api/conversations/sessions");
       const data = await res.json();
       
+      // NEVER overwrite currentSessionId from server - user's selection takes priority
+      // Only set it on initial page load when it's null AND we haven't loaded any sessions yet
+      if (currentSessionId === null && data.current_session_id) {
+        // Check if this is initial load (no history items exist yet)
+        const existingItems = historyList.querySelectorAll('.history-item');
+        if (existingItems.length === 0) {
+          currentSessionId = data.current_session_id;
+          console.log("Initial load - set currentSessionId from server:", currentSessionId);
+        }
+      }
+      console.log("loadHistoryList - currentSessionId is:", currentSessionId);
+      
       if (data.sessions && data.sessions.length > 0) {
         historyList.innerHTML = data.sessions.map(session => `
           <div class="history-item ${session.id === currentSessionId ? 'active' : ''}" data-session-id="${session.id}">
             <span class="history-icon">💬</span>
             <span class="history-text">${escapeHtml(session.preview) || 'New conversation'}</span>
             <span class="history-time">${formatTime(session.created_at)}</span>
+            <button class="history-delete-btn" data-session-id="${session.id}" title="Delete conversation">🗑️</button>
           </div>
         `).join("");
 
-        // Add click handlers
+        // Add click handlers for loading sessions
         historyList.querySelectorAll(".history-item").forEach(item => {
-          item.addEventListener("click", () => {
+          item.addEventListener("click", (e) => {
+            // Don't trigger if clicking delete button
+            if (e.target.classList.contains("history-delete-btn")) return;
             const sessId = parseInt(item.dataset.sessionId, 10);
             loadSession(sessId);
+          });
+        });
+
+        // Add click handlers for delete buttons
+        historyList.querySelectorAll(".history-delete-btn").forEach(btn => {
+          btn.addEventListener("click", async (e) => {
+            e.stopPropagation();
+            const sessId = parseInt(btn.dataset.sessionId, 10);
+            if (confirm("Delete this conversation?")) {
+              await deleteSession(sessId);
+            }
           });
         });
       } else {
@@ -1045,6 +1130,46 @@ document.addEventListener("DOMContentLoaded", () => {
     } catch (err) {
       console.error("Failed to load history:", err);
       historyList.innerHTML = '<div class="history-empty">Failed to load history</div>';
+    }
+  }
+
+  async function deleteSession(sessionId) {
+    try {
+      const res = await fetch(`/api/conversations/sessions/${sessionId}`, {
+        method: "DELETE"
+      });
+      const data = await res.json();
+      
+      if (data.success) {
+        // If we deleted the current session, clear the chat
+        if (sessionId === currentSessionId) {
+          currentSessionId = null;
+          chatBox.innerHTML = "";
+          // Don't show a bot message - just clear the chat
+        }
+        loadHistoryList();
+      }
+    } catch (err) {
+      console.error("Failed to delete session:", err);
+    }
+  }
+
+  async function startNewSession() {
+    try {
+      const res = await fetch("/api/conversations/sessions/new", {
+        method: "POST"
+      });
+      const data = await res.json();
+      
+      if (data.success) {
+        currentSessionId = null;  // Will be set when first message is sent
+        console.log("startNewSession - cleared currentSessionId, new session will be created on first message");
+        chatBox.innerHTML = "";
+        // Don't show a bot message - just clear the chat
+        loadHistoryList();
+      }
+    } catch (err) {
+      console.error("Failed to create new session:", err);
     }
   }
 
@@ -1063,10 +1188,29 @@ document.addEventListener("DOMContentLoaded", () => {
   async function loadSession(sessionId) {
     // Convert to integer
     const sessionIdInt = parseInt(sessionId, 10);
-    currentSessionId = sessionIdInt;
     chatBox.innerHTML = "";
     
+    // Show loading state
+    writeMessage("Loading conversation...", "bot");
+    
     try {
+      // First, switch session on server side to sync in-memory messages
+      const switchRes = await fetch(`/api/conversations/sessions/${sessionIdInt}/switch`, {
+        method: "POST"
+      });
+      
+      if (!switchRes.ok) {
+        throw new Error(`Failed to switch session: ${switchRes.status}`);
+      }
+      
+      const switchData = await switchRes.json();
+      currentSessionId = sessionIdInt;
+      console.log("loadSession - switched to session:", currentSessionId);
+      
+      // Clear loading message
+      chatBox.innerHTML = "";
+      
+      // Now load the conversation messages
       const res = await fetch(`/api/conversations?session_id=${sessionIdInt}&limit=100`);
       if (!res.ok) {
         throw new Error(`HTTP error! status: ${res.status}`);
@@ -1087,19 +1231,22 @@ document.addEventListener("DOMContentLoaded", () => {
               contentEl.innerHTML = parseMarkdown(conv.content);
             }
             if (conv.tool_name) {
-              const tools = conv.tool_name.split(",");
-              createToolSummary(tools, msg);
+              const tools = conv.tool_name.split(",").filter(t => t.trim());
+              if (tools.length > 0) {
+                createToolSummary(tools, msg);
+              }
             }
           }
         }
         chatArea.scrollTop = chatBox.scrollHeight;
       } else {
-        writeMessage("No messages in this conversation.", "bot");
+        writeMessage("This conversation is empty. Start chatting!", "bot");
       }
       
       loadHistoryList(); // Refresh to show active state
     } catch (err) {
       console.error("Failed to load session:", err);
+      chatBox.innerHTML = "";
       writeMessage("Failed to load conversation. Please try again.", "bot");
     }
   }
@@ -1119,13 +1266,24 @@ document.addEventListener("DOMContentLoaded", () => {
       const res = await fetch("/api/conversations?limit=50");
       const data = await res.json();
       
+      // Update currentSessionId from server response
+      if (data.session_id) {
+        currentSessionId = data.session_id;
+        console.log("loadCurrentSession set currentSessionId to:", currentSessionId);
+      }
+      
       if (data.conversations && data.conversations.length > 0) {
         chatBox.innerHTML = ""; // Clear any existing content first
         for (const conv of data.conversations) {
           if (conv.role === "user") {
             writeMessage(conv.content, "user");
           } else if (conv.role === "assistant") {
-            const msg = writeMessage(conv.content, "bot");
+            const msg = writeMessage("", "bot");
+            // Parse markdown for bot messages
+            const contentEl = msg.querySelector(".message-content");
+            if (contentEl) {
+              contentEl.innerHTML = parseMarkdown(conv.content);
+            }
             if (conv.tool_name) {
               const tools = conv.tool_name.split(",").filter(t => t.trim());
               if (tools.length > 0) {
@@ -1134,6 +1292,9 @@ document.addEventListener("DOMContentLoaded", () => {
             }
           }
         }
+        chatArea.scrollTop = chatBox.scrollHeight;
+        // Refresh history to show active session
+        loadHistoryList();
       }
     } catch (err) {
       console.error("Failed to load current session:", err);

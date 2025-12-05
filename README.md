@@ -15,7 +15,9 @@ A modern, AI-powered corporate assistant built with FastAPI and the Model Contex
 - **Streaming Chat** - Real-time responses with Server-Sent Events (SSE)
 - **Context-Aware** - Knows current user, datetime, and system context
 - **Markdown Support** - Rich formatting with code highlighting
-- **Conversation History** - Persistent chat history per user
+- **Persistent Conversations** - Chat history stored in database across sessions
+- **Multi-Session Support** - Create, switch, and delete conversation sessions
+- **History Sidebar** - Browse and manage past conversations
 
 ### 🔧 MCP Tools Integration
 - **Database CRUD** - Manage employees, projects, tasks, documents
@@ -264,9 +266,31 @@ Simply ask naturally: *"Search the web for latest AI news"*
 | `/logout` | GET | Logout user |
 | `/chat` | POST | Send chat message (SSE) |
 | `/upload` | POST | Upload document |
-| `/conversations` | GET | List user conversations |
-| `/conversations/{id}` | GET | Get conversation messages |
-| `/conversations/{id}` | DELETE | Delete conversation |
+| `/api/conversations` | GET | List user conversations |
+| `/api/conversations/sessions` | GET | List all chat sessions |
+| `/api/conversations/sessions/new` | POST | Create new chat session |
+| `/api/conversations/sessions/{id}/switch` | POST | Switch active session |
+| `/api/conversations/sessions/{id}` | DELETE | Delete session and messages |
+
+---
+
+## 💬 Conversation Management
+
+The AI Hub provides persistent conversation storage with session management:
+
+### Features
+- **Multiple Sessions** - Create separate conversations for different topics
+- **Auto-Save** - All messages automatically saved to database
+- **Session Preview** - First message shown as preview in history
+- **Switch Sessions** - Click any history item to load that conversation
+- **Delete Sessions** - Remove unwanted conversations with trash button
+- **Context Restoration** - Switching sessions restores full AI context
+
+### Usage
+1. **New Chat** - Click "New Chat" button to start fresh conversation
+2. **View History** - See all past sessions in the left sidebar
+3. **Switch Session** - Click any session to load its messages
+4. **Delete Session** - Click 🗑️ icon to remove a conversation
 
 ---
 

@@ -5,6 +5,7 @@ import webbrowser
 import os
 from pathlib import Path
 from datetime import datetime, timedelta
+from typing import Optional
 
 from fastapi import FastAPI, Request, Form, HTTPException, status, UploadFile, File
 from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse, PlainTextResponse, JSONResponse
@@ -119,6 +120,7 @@ messages = [{"role": "system", "content": get_system_prompt()}]
 
 class Message(BaseModel):
     user_input: str
+    session_id: Optional[int] = None
 
 
 @app.on_event("startup")
@@ -212,26 +214,17 @@ def logout():
 
 @app.post("/clearcache")
 def clearcache(request: Request):
-    from sqlmodel import select, delete
+    from sqlmodel import select
     global current_session_id
     
     messages.clear()
     messages.append({"role": "system", "content": get_system_prompt()})
-    current_session_id = None  # Start a new session
+    current_session_id = None  # Will create new session on next message
     
-    # Clear user's conversations from database
-    token = request.cookies.get("access_token")
-    if token:
-        payload = decode_token(token)
-        if payload:
-            with Session(engine) as s:
-                user = get_user_by_email(s, payload.get("sub"))
-                if user:
-                    # Delete user's conversations
-                    s.exec(delete(Conversation).where(Conversation.user_id == user.id))
-                    s.commit()
+    # Note: We no longer delete conversations - just clear in-memory cache
+    # Previous conversations are preserved in the database
     
-    return {"status": "cleared"}
+    return JSONResponse(content={"success": True, "message": "Cache cleared"})
 
 def get_current_user_from_token(request: Request):
     token = request.cookies.get("access_token")
@@ -250,16 +243,7 @@ def get_current_user_from_token(request: Request):
 @app.post("/api/chat/stream", response_class=PlainTextResponse)
 async def chat_stream(request: Request, msg: Message):
     """Streams the agent response as Server-Sent Events (SSE)."""
-    global current_session_id
-    
-    # Refresh system prompt with current datetime on each request
-    if messages and messages[0]["role"] == "system":
-        messages[0]["content"] = get_system_prompt()
-    
-    if len(messages) >= 12:
-        # Keep system prompt (index 0) and remove oldest user/assistant pair
-        messages.pop(1)
-        messages.pop(1)
+    global current_session_id, messages, current_user_data
     
     # Get current user ID for saving conversation
     user_id = None
@@ -271,9 +255,51 @@ async def chat_stream(request: Request, msg: Message):
                 user = get_user_by_email(s, payload.get("sub"))
                 if user:
                     user_id = user.id
+                    # Update user context
+                    current_user_data = {
+                        "id": user.id,
+                        "email": user.email,
+                        "name": user.full_name or user.email,
+                        "role": user.role,
+                        "department": user.department,
+                        "access_level": user.access_level,
+                        "access_name": {1: "read-only", 2: "write", 3: "admin"}.get(user.access_level, "unknown")
+                    }
     
-    # Create or get session
-    session_id = current_session_id
+    # Determine session_id - prefer from request, fall back to global
+    session_id = msg.session_id if (msg.session_id is not None and msg.session_id > 0) else current_session_id
+    
+    # ALWAYS reload messages from database when we have a session_id
+    # This ensures the AI has the COMPLETE and CORRECT conversation context
+    if session_id:
+        from sqlmodel import select
+        with Session(engine) as s:
+            # Clear and reload messages from database
+            messages.clear()
+            messages.append({"role": "system", "content": get_system_prompt()})
+            
+            statement = select(Conversation).where(
+                Conversation.session_id == session_id
+            ).order_by(Conversation.created_at.asc())
+            
+            conversations = s.exec(statement).all()
+            
+            for conv in conversations:
+                if conv.role in ["user", "assistant"]:
+                    messages.append({"role": conv.role, "content": conv.content})
+            
+            current_session_id = session_id
+    else:
+        # No session yet - just refresh system prompt
+        messages.clear()
+        messages.append({"role": "system", "content": get_system_prompt()})
+    
+    # Limit message history to prevent token overflow
+    while len(messages) > 12:
+        # Keep system prompt (index 0), remove oldest user/assistant pair
+        if len(messages) > 2:
+            messages.pop(1)
+    
     if msg.user_input:
         with Session(engine) as s:
             # Create new session if none exists
@@ -456,6 +482,7 @@ async def get_user_access(request: Request):
 @app.get("/api/conversations")
 async def get_conversations(request: Request, session_id: int = None, limit: int = 50):
     """Get conversation history for current user."""
+    global current_session_id
     from sqlmodel import select
     
     token = request.cookies.get("access_token")
@@ -471,17 +498,33 @@ async def get_conversations(request: Request, session_id: int = None, limit: int
         if not user:
             raise HTTPException(status_code=401, detail="User not found")
         
-        if session_id:
-            statement = select(Conversation).where(
-                Conversation.user_id == user.id,
-                Conversation.session_id == session_id
-            ).order_by(Conversation.created_at.asc()).limit(limit)
-        else:
-            # Get current session conversations
-            statement = select(Conversation).where(
-                Conversation.user_id == user.id,
-                Conversation.session_id == current_session_id
-            ).order_by(Conversation.created_at.asc()).limit(limit)
+        # Determine which session to use
+        target_session_id = session_id
+        
+        if not target_session_id:
+            # If no session specified and no current session, get the most recent one
+            if not current_session_id:
+                recent_session = s.exec(
+                    select(ChatSession)
+                    .where(ChatSession.user_id == user.id)
+                    .where(ChatSession.is_active == True)
+                    .order_by(ChatSession.created_at.desc())
+                    .limit(1)
+                ).first()
+                if recent_session:
+                    current_session_id = recent_session.id
+                    target_session_id = recent_session.id
+            else:
+                target_session_id = current_session_id
+        
+        if not target_session_id:
+            # No sessions exist for this user
+            return JSONResponse(content={"conversations": [], "session_id": None})
+        
+        statement = select(Conversation).where(
+            Conversation.user_id == user.id,
+            Conversation.session_id == target_session_id
+        ).order_by(Conversation.created_at.asc()).limit(limit)
         
         conversations = s.exec(statement).all()
         
@@ -496,7 +539,8 @@ async def get_conversations(request: Request, session_id: int = None, limit: int
                     "created_at": c.created_at.isoformat() if c.created_at else None
                 }
                 for c in conversations
-            ]
+            ],
+            "session_id": target_session_id
         })
 
 
@@ -533,5 +577,139 @@ async def get_sessions(request: Request, limit: int = 20):
                     "created_at": sess.created_at.isoformat() if sess.created_at else None
                 }
                 for sess in sessions
-            ]
+            ],
+            "current_session_id": current_session_id
+        })
+
+
+@app.post("/api/conversations/sessions/{session_id}/switch")
+async def switch_session(request: Request, session_id: int):
+    """Switch to an existing chat session."""
+    global current_session_id, messages, current_user_data
+    from sqlmodel import select
+    
+    token = request.cookies.get("access_token")
+    if not token:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    payload = decode_token(token)
+    if not payload:
+        raise HTTPException(status_code=401, detail="Invalid token")
+    
+    with Session(engine) as s:
+        user = get_user_by_email(s, payload.get("sub"))
+        if not user:
+            raise HTTPException(status_code=401, detail="User not found")
+        
+        # Verify session belongs to user
+        session = s.get(ChatSession, session_id)
+        if not session or session.user_id != user.id:
+            raise HTTPException(status_code=404, detail="Session not found")
+        
+        # Update current user data context
+        current_user_data = {
+            "id": user.id,
+            "email": user.email,
+            "name": user.full_name or user.email,
+            "role": user.role,
+            "department": user.department,
+            "access_level": user.access_level,
+            "access_name": {1: "read-only", 2: "write", 3: "admin"}.get(user.access_level, "unknown")
+        }
+        
+        # Load messages from this session into memory with fresh system prompt
+        messages.clear()
+        messages.append({"role": "system", "content": get_system_prompt()})
+        
+        statement = select(Conversation).where(
+            Conversation.session_id == session_id
+        ).order_by(Conversation.created_at.asc())
+        
+        conversations = s.exec(statement).all()
+        loaded_count = len(conversations)
+        for conv in conversations:
+            if conv.role in ["user", "assistant"]:
+                messages.append({"role": conv.role, "content": conv.content})
+    
+    # Update global session ID OUTSIDE the db session
+    current_session_id = session_id
+    
+    return JSONResponse(content={
+        "success": True,
+        "session_id": session_id,
+        "message_count": loaded_count,
+        "messages_in_memory": len(messages),
+        "user": current_user_data.get("name")
+    })
+
+
+@app.delete("/api/conversations/sessions/{session_id}")
+async def delete_session(request: Request, session_id: int):
+    """Delete a chat session and all its messages."""
+    global current_session_id, messages
+    from sqlmodel import select, delete as sql_delete
+    
+    token = request.cookies.get("access_token")
+    if not token:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    payload = decode_token(token)
+    if not payload:
+        raise HTTPException(status_code=401, detail="Invalid token")
+    
+    with Session(engine) as s:
+        user = get_user_by_email(s, payload.get("sub"))
+        if not user:
+            raise HTTPException(status_code=401, detail="User not found")
+        
+        # Verify session belongs to user
+        session = s.get(ChatSession, session_id)
+        if not session or session.user_id != user.id:
+            raise HTTPException(status_code=404, detail="Session not found")
+        
+        # Delete all messages in this session
+        s.exec(sql_delete(Conversation).where(Conversation.session_id == session_id))
+        
+        # Delete the session
+        s.delete(session)
+        s.commit()
+        
+        # If this was the current session, reset
+        if current_session_id == session_id:
+            current_session_id = None
+            messages.clear()
+            messages.append({"role": "system", "content": get_system_prompt()})
+        
+        return JSONResponse(content={"success": True, "deleted_session_id": session_id})
+
+
+@app.post("/api/conversations/sessions/new")
+async def create_new_session(request: Request):
+    """Create a new empty chat session."""
+    global current_session_id, messages
+    
+    token = request.cookies.get("access_token")
+    if not token:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    payload = decode_token(token)
+    if not payload:
+        raise HTTPException(status_code=401, detail="Invalid token")
+    
+    with Session(engine) as s:
+        user = get_user_by_email(s, payload.get("sub"))
+        if not user:
+            raise HTTPException(status_code=401, detail="User not found")
+        
+        # Reset in-memory messages - don't create DB session yet
+        # Session will be created on first message with proper preview
+        messages.clear()
+        messages.append({"role": "system", "content": get_system_prompt()})
+        
+        # Clear current session - new one will be created on first message
+        current_session_id = None
+        
+        return JSONResponse(content={
+            "success": True,
+            "session_id": None  # Will be created on first message
         })

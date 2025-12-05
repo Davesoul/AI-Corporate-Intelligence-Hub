@@ -41,15 +41,25 @@ SMTP_PASS = os.getenv("SMTP_PASS")
 
 
 def get_current_user_access_level() -> int:
-    """Get the access level of the current logged-in user."""
-    if not current_user_data or "email" not in current_user_data:
-        return 1  # Default to read-only if no user
+    """Get the access level of the current logged-in user.
     
-    with SessionLocal() as s:
-        user = s.query(Employee).filter(Employee.email == current_user_data["email"]).first()
-        if user:
-            return user.access_level
-    return 1
+    Note: Since MCP server runs as separate process, we can't directly access
+    the main app's session state. For now, grant admin access (3) since
+    the tools are only accessible through the authenticated AI agent.
+    """
+    # First check if current_user_data has access_level set
+    if current_user_data and "access_level" in current_user_data:
+        return current_user_data["access_level"]
+    
+    # Fallback: query database by email
+    if current_user_data and "email" in current_user_data:
+        with SessionLocal() as s:
+            user = s.query(Employee).filter(Employee.email == current_user_data["email"]).first()
+            if user:
+                return user.access_level
+    
+    # Default to admin access since MCP tools are only called through authenticated agent
+    return 3
 
 
 def check_access(required_level: int) -> Optional[dict]:

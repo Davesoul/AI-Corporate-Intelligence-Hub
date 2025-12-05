@@ -205,3 +205,31 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# Document files (keep source .md, ignore generated docs)
+*.docx
+*.pdf
+*.pptx
+
+# Output directory (generated files)
+output/
+
+# Backup files
+*_BACKUP.md
+
+# Database files
+*.db
+*.pkl
+
+# Uploaded files
+uploads/
+
+# Images folder (screenshots for report)
+images/
+
+# Conversion scripts and video script (not part of main project)
+convert_report.py
+convert_report_simple.py
+create_presentation.py
+CONVERSION_README.md
+VIDEO_SCRIPT.md
